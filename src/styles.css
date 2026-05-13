@@ -1140,14 +1140,14 @@ th {
 
 @media (max-width: 720px) {
   .topbar {
-    align-items: flex-start;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px 12px;
   }
 
   .topbar-actions {
-    width: 100%;
-    display: grid;
-    gap: 12px;
+    display: contents;
   }
 
   .topbar-primary-actions {
@@ -1155,6 +1155,8 @@ th {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: stretch;
     gap: 10px;
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 
   .topbar-primary-actions .month-picker,
@@ -1164,8 +1166,26 @@ th {
   }
 
   .topbar-utility-actions {
+    grid-column: 3;
+    grid-row: 1;
     justify-self: end;
     margin-left: 0;
+    z-index: 2;
+  }
+
+  .mobile-only {
+    display: inline-flex;
+    grid-column: 1;
+    grid-row: 1;
+    z-index: 2;
+  }
+
+  .topbar-title {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    justify-self: center;
+    text-align: center;
+    padding: 0 126px 0 66px;
   }
 
   .month-trigger {
@@ -1221,6 +1241,10 @@ th {
     padding: calc(12px + var(--safe-top)) calc(12px + var(--safe-right)) calc(92px + var(--safe-bottom)) calc(12px + var(--safe-left));
   }
 
+  .topbar {
+    gap: 12px 10px;
+  }
+
   .form-actions {
     display: grid;
     grid-template-columns: 1fr;
@@ -1233,6 +1257,17 @@ th {
   .topbar-utility-actions {
     width: fit-content;
     max-width: 100%;
+    gap: 4px;
+    padding: 4px;
+  }
+
+  .topbar-title {
+    padding: 0 114px 0 58px;
+  }
+
+  .utility-button {
+    width: 36px;
+    min-height: 36px;
   }
 
   .primary-button,

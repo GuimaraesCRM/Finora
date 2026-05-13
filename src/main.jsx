@@ -110,6 +110,7 @@ function App() {
   const [filters, setFilters] = useState({ search: "", type: "all", accountId: "all", status: "all", dateFrom: "", dateTo: "", minAmount: "", maxAmount: "", tag: "" });
   const [theme, setTheme] = useState(localStorage.getItem("finora-theme") || "light");
   const [seenNotificationSignature, setSeenNotificationSignature] = useState("");
+  const [notificationPanelStyle, setNotificationPanelStyle] = useState(null);
   const notificationWrapRef = useRef(null);
 
   const currency = user?.currency || "BRL";
@@ -149,6 +150,7 @@ function App() {
     if (!notificationsOpen) return undefined;
 
     markNotificationsSeen();
+    positionNotificationPanel();
 
     function handlePointerDown(event) {
       if (notificationWrapRef.current && !notificationWrapRef.current.contains(event.target)) {
@@ -160,9 +162,13 @@ function App() {
       if (event.key === "Escape") setNotificationsOpen(false);
     }
 
+    window.addEventListener("resize", positionNotificationPanel);
+    window.addEventListener("scroll", positionNotificationPanel, true);
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
     return () => {
+      window.removeEventListener("resize", positionNotificationPanel);
+      window.removeEventListener("scroll", positionNotificationPanel, true);
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
@@ -253,6 +259,25 @@ function App() {
     if (notificationStorageKey) {
       localStorage.setItem(notificationStorageKey, signature);
     }
+  }
+
+  function positionNotificationPanel() {
+    if (!notificationWrapRef.current) return;
+    const rect = notificationWrapRef.current.getBoundingClientRect();
+    const gutter = 12;
+    const maxWidth = Math.min(360, window.innerWidth - gutter * 2);
+    const left = Math.min(Math.max(rect.right - maxWidth, gutter), window.innerWidth - gutter - maxWidth);
+    const top = rect.bottom + 10;
+    const maxHeight = Math.max(180, window.innerHeight - top - gutter);
+    setNotificationPanelStyle({
+      position: "fixed",
+      top: `${top}px`,
+      left: `${left}px`,
+      right: "auto",
+      width: `${maxWidth}px`,
+      maxHeight: `${maxHeight}px`,
+      overflow: "auto",
+    });
   }
 
   async function mutate(path, options, message) {
@@ -346,7 +371,7 @@ function App() {
                   <Bell size={20} />
                   {unreadNotifications > 0 && <span className="badge">{unreadNotifications}</span>}
                 </button>
-                {notificationsOpen && <NotificationsPanel notifications={data.notifications} />}
+                {notificationsOpen && <NotificationsPanel notifications={data.notifications} style={notificationPanelStyle} />}
               </div>
               <button className="icon-button utility-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Alternar tema">
                 {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
@@ -1296,9 +1321,9 @@ function NotificationList({ notifications }) {
   );
 }
 
-function NotificationsPanel({ notifications }) {
+function NotificationsPanel({ notifications, style }) {
   return (
-    <div className="notification-panel">
+    <div className="notification-panel" style={style}>
       <div className="notification-panel-head">
         <strong>Notificações</strong>
         <span>{notifications.length}</span>
