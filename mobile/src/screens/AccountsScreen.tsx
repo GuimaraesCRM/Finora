@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, Switch, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { AccountEditor } from "../components/AccountEditor";
@@ -132,32 +132,38 @@ export function AccountsScreen() {
             {accounts.length ? (
               <View style={{ gap: 12 }}>
                 {accounts.map((account) => (
-                  <SurfaceCard key={account.id} style={{ padding: 18 }}>
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                          <View style={{ width: 14, height: 14, borderRadius: 999, backgroundColor: account.color }} />
-                          <Text style={{ color: palette.text, fontWeight: "800", fontSize: 18, flexShrink: 1 }}>{account.name}</Text>
+                  <Pressable key={account.id} onPress={() => { setSelected(account); setEditorOpen(true); }} hitSlop={8}>
+                    <SurfaceCard style={{ padding: 18 }}>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                            <View style={{ width: 14, height: 14, borderRadius: 999, backgroundColor: account.color }} />
+                            <Text style={{ color: palette.text, fontWeight: "800", fontSize: 18, flexShrink: 1 }}>{account.name}</Text>
+                          </View>
+                          <Text style={{ color: palette.muted, marginTop: 8 }}>{accountTypeLabel(account.type)}</Text>
+                          <Text style={{ color: (account.balance || 0) >= 0 ? palette.text : palette.bad, fontSize: 26, fontWeight: "900", marginTop: 16 }}>
+                            {formatMoney(account.balance || 0, session.user?.currency)}
+                          </Text>
                         </View>
-                        <Text style={{ color: palette.muted, marginTop: 8 }}>{accountTypeLabel(account.type)}</Text>
-                        <Text style={{ color: (account.balance || 0) >= 0 ? palette.text : palette.bad, fontSize: 26, fontWeight: "900", marginTop: 16 }}>
-                          {formatMoney(account.balance || 0, session.user?.currency)}
-                        </Text>
+
+                        <View style={{ paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, backgroundColor: palette.primarySoft, alignSelf: "flex-start" }}>
+                          <Text style={{ color: palette.primary, fontSize: 12, fontWeight: "800" }}>Toque para editar</Text>
+                        </View>
                       </View>
 
-                      <View style={{ alignItems: "flex-end", gap: 10 }}>
-                        <MiniAction icon="create-outline" onPress={() => { setSelected(account); setEditorOpen(true); }} />
-                        <MiniAction icon="trash-outline" onPress={() => removeAccount(account)} tone="bad" />
+                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 16 }}>
+                        {account.shared && <Pill label="Compartilhada" color={palette.primary} />}
+                        {account.type === "credit" && <Pill label={`Limite ${formatMoney(account.creditLimit || 0, session.user?.currency)}`} color={palette.warning} />}
+                        {account.type === "credit" && account.closingDay && <Pill label={`Fecha dia ${account.closingDay}`} color={palette.muted} />}
+                        {account.type === "credit" && account.dueDay && <Pill label={`Vence dia ${account.dueDay}`} color={palette.muted} />}
                       </View>
-                    </View>
 
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 16 }}>
-                      {account.shared && <Pill label="Compartilhada" color={palette.primary} />}
-                      {account.type === "credit" && <Pill label={`Limite ${formatMoney(account.creditLimit || 0, session.user?.currency)}`} color={palette.warning} />}
-                      {account.type === "credit" && account.closingDay && <Pill label={`Fecha dia ${account.closingDay}`} color={palette.muted} />}
-                      {account.type === "credit" && account.dueDay && <Pill label={`Vence dia ${account.dueDay}`} color={palette.muted} />}
-                    </View>
-                  </SurfaceCard>
+                      <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+                        <RowAction label="Editar" icon="create-outline" onPress={() => { setSelected(account); setEditorOpen(true); }} />
+                        <RowAction label="Excluir" icon="trash-outline" onPress={() => removeAccount(account)} tone="bad" />
+                      </View>
+                    </SurfaceCard>
+                  </Pressable>
                 ))}
               </View>
             ) : (
@@ -198,11 +204,13 @@ function Pill({ label, color }: { label: string; color: string }) {
   );
 }
 
-function MiniAction({
+function RowAction({
+  label,
   icon,
   onPress,
   tone = "default",
 }: {
+  label: string;
   icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
   tone?: "default" | "bad";
@@ -213,17 +221,21 @@ function MiniAction({
   return (
     <Pressable
       onPress={onPress}
+      hitSlop={8}
       style={({ pressed }) => ({
-        width: 34,
-        height: 34,
-        borderRadius: 12,
+        minHeight: 44,
+        flex: 1,
+        borderRadius: 14,
         backgroundColor: palette.surfaceSoft,
         alignItems: "center",
         justifyContent: "center",
+        flexDirection: "row",
+        gap: 8,
         opacity: pressed ? 0.8 : 1,
       })}
     >
       <Ionicons name={icon} size={17} color={color} />
+      <Text style={{ color, fontWeight: "800" }}>{label}</Text>
     </Pressable>
   );
 }

@@ -239,9 +239,19 @@ app.delete("/api/accounts/:id", auth, async (req: AuthRequest, res, next) => {
       where: { userId: req.userId, OR: [{ accountId: id }, { transferAccountId: id }] },
     });
     const recurring = await prisma.recurring.count({ where: { userId: req.userId, accountId: id } });
-    if (linked || recurring) return res.status(409).json({ error: "A conta possui vínculos. Arquive ou remova os vínculos antes." });
+    if (linked || recurring) {
+      await prisma.account.update({
+        where: { id },
+        data: { archived: true },
+      });
+      return res.json({
+        ok: true,
+        archived: true,
+        message: "A conta possuia vínculos e foi arquivada automaticamente.",
+      });
+    }
     await prisma.account.delete({ where: { id } });
-    res.json({ ok: true });
+    res.json({ ok: true, archived: false });
   } catch (error) {
     next(error);
   }

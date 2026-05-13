@@ -198,9 +198,9 @@ export function SelectorModal({
   const palette = usePalette();
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={[styles.modalLayer, { backgroundColor: "rgba(0,0,0,0.45)" }]}>
-        <Pressable style={{ flex: 1 }} onPress={onClose} />
+    <Modal visible={visible} animationType="fade" transparent presentationStyle="overFullScreen" onRequestClose={onClose}>
+      <View style={styles.modalLayer}>
+        <Pressable style={styles.modalBackdrop} onPress={onClose} />
         <View style={[styles.modalCard, { backgroundColor: palette.surface }]}>
           <View style={[styles.rowBetween, { marginBottom: 14 }]}>
             <Text style={{ color: palette.text, fontSize: 18, fontWeight: "800" }}>{title}</Text>
@@ -313,11 +313,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "flex-end",
   },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
   modalCard: {
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     padding: 18,
     paddingBottom: 34,
+    zIndex: 1,
   },
   optionRow: {
     minHeight: 58,

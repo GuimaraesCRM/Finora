@@ -137,9 +137,9 @@ export function TransactionEditor({
 
   return (
     <>
-      <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-        <View style={[styles.layer, { backgroundColor: "rgba(0,0,0,0.45)" }]}>
-          <Pressable style={{ flex: 1 }} onPress={onClose} />
+      <Modal visible={visible} animationType="fade" transparent presentationStyle="overFullScreen" onRequestClose={onClose}>
+        <View style={styles.layer}>
+          <Pressable style={styles.backdrop} onPress={onClose} />
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
             <View style={[styles.sheet, { backgroundColor: palette.surface }]}>
               <View style={styles.header}>
@@ -373,9 +373,9 @@ function DatePickerSheet({
   const palette = usePalette();
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onCancel}>
-      <View style={[styles.layer, { backgroundColor: "rgba(0,0,0,0.45)" }]}>
-        <Pressable style={{ flex: 1 }} onPress={onCancel} />
+    <Modal visible={visible} animationType="fade" transparent presentationStyle="overFullScreen" onRequestClose={onCancel}>
+      <View style={styles.layer}>
+        <Pressable style={styles.backdrop} onPress={onCancel} />
         <View style={[styles.sheet, { backgroundColor: palette.surface, maxHeight: 360 }]}>
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
@@ -452,11 +452,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "flex-end",
   },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
   sheet: {
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     padding: 18,
     maxHeight: "92%",
+    zIndex: 1,
   },
   header: {
     flexDirection: "row",

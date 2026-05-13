@@ -90,8 +90,9 @@ export function AccountEditor({
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={[styles.layer, { backgroundColor: "rgba(0,0,0,0.42)" }]}>
+    <Modal visible={visible} animationType="fade" transparent presentationStyle="overFullScreen" onRequestClose={onClose}>
+      <View style={styles.layer}>
+        <Pressable style={styles.backdrop} onPress={onClose} />
         <View style={[styles.sheet, { backgroundColor: palette.surface }]}>
           <View style={styles.header}>
             <View>
@@ -103,7 +104,7 @@ export function AccountEditor({
             </Pressable>
           </View>
 
-          <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 20 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="always">
             <LabeledField label="Nome da conta" value={form.name} onChangeText={(name) => setForm((current) => ({ ...current, name }))} placeholder="Ex.: Nubank, Carteira, Reserva..." />
 
             <View style={{ gap: 8 }}>
@@ -177,11 +178,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "flex-end",
   },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.42)",
+  },
   sheet: {
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     padding: 18,
     maxHeight: "92%",
+    zIndex: 1,
   },
   header: {
     flexDirection: "row",
