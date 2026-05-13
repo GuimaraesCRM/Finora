@@ -207,6 +207,25 @@ nav {
   gap: 10px;
 }
 
+.topbar-primary-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar-utility-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-left: auto;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-strong) 92%, transparent);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
 input,
 select,
 textarea {
@@ -309,6 +328,14 @@ textarea:focus {
 
 .notification-wrap {
   position: relative;
+}
+
+.utility-button {
+  width: 40px;
+  min-height: 40px;
+  border-radius: 999px;
+  border-color: transparent;
+  background: transparent;
 }
 
 .badge {
@@ -1119,13 +1146,26 @@ th {
 
   .topbar-actions {
     width: 100%;
-    align-items: stretch;
+    display: grid;
+    gap: 12px;
   }
 
-  .topbar-actions .primary-button,
-  .month-picker,
-  .month-trigger {
-    flex: 1 1 0;
+  .topbar-primary-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .topbar-primary-actions .month-picker,
+  .topbar-primary-actions .month-trigger,
+  .topbar-primary-actions .primary-button {
+    width: 100%;
+  }
+
+  .topbar-utility-actions {
+    justify-self: end;
+    margin-left: 0;
   }
 
   .month-trigger {
@@ -1181,10 +1221,18 @@ th {
     padding: calc(12px + var(--safe-top)) calc(12px + var(--safe-right)) calc(92px + var(--safe-bottom)) calc(12px + var(--safe-left));
   }
 
-  .topbar-actions,
   .form-actions {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .topbar-primary-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar-utility-actions {
+    width: fit-content;
+    max-width: 100%;
   }
 
   .primary-button,

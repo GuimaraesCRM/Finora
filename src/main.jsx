@@ -109,11 +109,19 @@ function App() {
   const [toast, setToast] = useState("");
   const [filters, setFilters] = useState({ search: "", type: "all", accountId: "all", status: "all", dateFrom: "", dateTo: "", minAmount: "", maxAmount: "", tag: "" });
   const [theme, setTheme] = useState(localStorage.getItem("finora-theme") || "light");
+  const [seenNotificationSignature, setSeenNotificationSignature] = useState("");
+  const notificationWrapRef = useRef(null);
 
   const currency = user?.currency || "BRL";
   const expenseCategories = data.categories.filter((item) => item.type === "expense");
   const incomeCategories = data.categories.filter((item) => item.type === "income");
   const mobileDockItems = useMemo(() => navItems.filter((item) => ["dashboard", "transactions", "accounts", "reports"].includes(item.id)), []);
+  const notificationStorageKey = user?.id ? `finora-notifications-seen:${user.id}` : "";
+  const notificationSignature = useMemo(
+    () => data.notifications.map((item) => `${item.id}:${item.title}:${item.body}:${item.tone}`).join("|"),
+    [data.notifications],
+  );
+  const unreadNotifications = notificationSignature && notificationSignature !== seenNotificationSignature ? data.notifications.length : 0;
 
   useEffect(() => {
     boot();
@@ -132,6 +140,33 @@ function App() {
   useEffect(() => {
     localStorage.setItem("finora-section", section);
   }, [section]);
+
+  useEffect(() => {
+    setSeenNotificationSignature(notificationStorageKey ? localStorage.getItem(notificationStorageKey) || "" : "");
+  }, [notificationStorageKey]);
+
+  useEffect(() => {
+    if (!notificationsOpen) return undefined;
+
+    markNotificationsSeen();
+
+    function handlePointerDown(event) {
+      if (notificationWrapRef.current && !notificationWrapRef.current.contains(event.target)) {
+        setNotificationsOpen(false);
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") setNotificationsOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [notificationsOpen, notificationSignature, notificationStorageKey]);
 
   async function boot() {
     try {
@@ -209,7 +244,15 @@ function App() {
     localStorage.removeItem("finora-token");
     setToken("");
     setUser(null);
+    setNotificationsOpen(false);
     setData(emptyData());
+  }
+
+  function markNotificationsSeen(signature = notificationSignature) {
+    setSeenNotificationSignature(signature);
+    if (notificationStorageKey) {
+      localStorage.setItem(notificationStorageKey, signature);
+    }
   }
 
   async function mutate(path, options, message) {
@@ -293,19 +336,23 @@ function App() {
             <h1>{navItems.find((item) => item.id === section)?.label}</h1>
           </div>
           <div className="topbar-actions">
-            <MonthPicker value={month} onChange={setMonth} currency={currency} />
-            <button className="primary-button" onClick={() => setSection("transactions")}><Plus size={18} /> Novo</button>
-            <div className="notification-wrap">
-              <button className="icon-button" onClick={() => setNotificationsOpen(!notificationsOpen)} aria-label="Notificações">
-                <Bell size={20} />
-                {data.notifications.length > 0 && <span className="badge">{data.notifications.length}</span>}
-              </button>
-              {notificationsOpen && <NotificationsPanel notifications={data.notifications} />}
+            <div className="topbar-primary-actions">
+              <MonthPicker value={month} onChange={setMonth} currency={currency} />
+              <button className="primary-button" onClick={() => setSection("transactions")}><Plus size={18} /> Novo</button>
             </div>
-            <button className="icon-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Alternar tema">
-              {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
-            </button>
-            <button className="icon-button" onClick={logout} aria-label="Sair"><LogOut size={20} /></button>
+            <div className="topbar-utility-actions" aria-label="Ações rápidas">
+              <div className="notification-wrap" ref={notificationWrapRef}>
+                <button className="icon-button utility-button" onClick={() => setNotificationsOpen((current) => !current)} aria-label="Notificações">
+                  <Bell size={20} />
+                  {unreadNotifications > 0 && <span className="badge">{unreadNotifications}</span>}
+                </button>
+                {notificationsOpen && <NotificationsPanel notifications={data.notifications} />}
+              </div>
+              <button className="icon-button utility-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Alternar tema">
+                {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
+              <button className="icon-button utility-button" onClick={logout} aria-label="Sair"><LogOut size={20} /></button>
+            </div>
           </div>
         </header>
 
@@ -752,10 +799,19 @@ function Budgets({ data, currency, expenseCategories, month, mutate }) {
     setOpen(true);
   }
 
+  async function remove(budget) {
+    if (!window.confirm(`Excluir o orçamento de ${budget.category?.name || "categoria"}?`)) return;
+    await mutate(`/budgets/${budget.id}`, { method: "DELETE" }, "Orçamento excluído.");
+    if (form.id === budget.id) {
+      setForm(blank());
+      setOpen(false);
+    }
+  }
+
   return (
     <>
       <Panel title="Orçamentos" subtitle={`${data.budgets.length} ativos`} action={<button className="primary-button" onClick={() => { setForm(blank()); setOpen(true); }}><Plus size={18} /> Novo orçamento</button>}>
-        <ProgressList items={data.budgets.map((budget) => ({ id: budget.id, title: budget.category?.name, meta: `${money(budget.spent, currency)} de ${money(budget.limit, currency)}`, percent: budget.limit ? (budget.spent / budget.limit) * 100 : 0, color: budget.category?.color, onEdit: () => edit(budget) }))} />
+        <ProgressList items={data.budgets.map((budget) => ({ id: budget.id, title: budget.category?.name, meta: `${money(budget.spent, currency)} de ${money(budget.limit, currency)}`, percent: budget.limit ? (budget.spent / budget.limit) * 100 : 0, color: budget.category?.color, onEdit: () => edit(budget), onDelete: () => remove(budget) }))} />
       </Panel>
       <Modal open={open} title={form.id ? "Editar orçamento" : "Novo orçamento"} subtitle="Limites mensais por categoria" onClose={() => setOpen(false)}>
         <form className="stacked-form" onSubmit={submit}>
@@ -791,10 +847,19 @@ function Goals({ data, currency, mutate }) {
     setOpen(true);
   }
 
+  async function remove(goal) {
+    if (!window.confirm(`Excluir a meta "${goal.name}"?`)) return;
+    await mutate(`/goals/${goal.id}`, { method: "DELETE" }, "Meta excluída.");
+    if (form.id === goal.id) {
+      setForm(blank());
+      setOpen(false);
+    }
+  }
+
   return (
     <>
       <Panel title="Metas" subtitle="Progresso, prazo e aporte" action={<button className="primary-button" onClick={() => { setForm(blank()); setOpen(true); }}><Plus size={18} /> Nova meta</button>}>
-        <ProgressList items={data.goals.map((goal) => ({ id: goal.id, title: goal.name, meta: `${money(goal.saved, currency)} de ${money(goal.target, currency)} · ${formatDate(goal.dueDate)}`, percent: goal.target ? (goal.saved / goal.target) * 100 : 0, color: goal.color, onEdit: () => edit(goal) }))} />
+        <ProgressList items={data.goals.map((goal) => ({ id: goal.id, title: goal.name, meta: `${money(goal.saved, currency)} de ${money(goal.target, currency)} · ${formatDate(goal.dueDate)}`, percent: goal.target ? (goal.saved / goal.target) * 100 : 0, color: goal.color, onEdit: () => edit(goal), onDelete: () => remove(goal) }))} />
       </Panel>
       <Modal open={open} title={form.id ? "Editar meta" : "Nova meta"} subtitle="Reserva, viagem, compra ou quitação" onClose={() => setOpen(false)}>
         <form className="stacked-form" onSubmit={submit}>
@@ -839,6 +904,15 @@ function Recurring({ data, currency, expenseCategories, incomeCategories, mutate
     setOpen(true);
   }
 
+  async function remove(item) {
+    if (!window.confirm(`Excluir a recorrência "${item.description}"?`)) return;
+    await mutate(`/recurring/${item.id}`, { method: "DELETE" }, "Recorrência excluída.");
+    if (form.id === item.id) {
+      setForm(blank());
+      setOpen(false);
+    }
+  }
+
   return (
     <>
       <Panel title="Recorrentes" subtitle="Geração manual de lançamentos" action={<button className="primary-button" onClick={() => { setForm(blank()); setOpen(true); }}><Plus size={18} /> Nova recorrência</button>}>
@@ -850,6 +924,7 @@ function Recurring({ data, currency, expenseCategories, incomeCategories, mutate
                 <b>{signedAmount(item, currency)}</b>
                 <button className="mini-button" onClick={() => run(item.id)} aria-label="Gerar"><Play size={16} /></button>
                 <button className="mini-button" onClick={() => edit(item)} aria-label="Editar"><Edit3 size={16} /></button>
+                <button className="mini-button" onClick={() => remove(item)} aria-label="Excluir"><Trash2 size={16} /></button>
               </div>
             </article>
           )) : <Empty text="Nenhuma recorrência cadastrada." />}
@@ -1185,7 +1260,12 @@ function ProgressList({ items }) {
         <article className="progress-item" key={item.id || item.title}>
           <div className="progress-title">
             <div><strong>{item.title}</strong><span>{item.meta}</span></div>
-            {item.onEdit && <button className="mini-button" onClick={item.onEdit} aria-label="Editar"><Edit3 size={16} /></button>}
+            {(item.onEdit || item.onDelete) && (
+              <div className="row-actions">
+                {item.onEdit && <button className="mini-button" onClick={item.onEdit} aria-label="Editar"><Edit3 size={16} /></button>}
+                {item.onDelete && <button className="mini-button" onClick={item.onDelete} aria-label="Excluir"><Trash2 size={16} /></button>}
+              </div>
+            )}
           </div>
           <div className="progress-bar"><div style={{ width: `${Math.min(item.percent, 100)}%`, background: item.color || "#0f8f88" }} /></div>
         </article>
