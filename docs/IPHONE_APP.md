@@ -1,113 +1,214 @@
-# App iPhone do Finora
+# App iPhone Nativo do Finora
 
-## 1. Como o app funciona
+## 1. Visao geral
 
-O app iPhone do Finora usa o mesmo backend e o mesmo banco do sistema web. Isso significa:
+O Finora agora tem uma base de app iPhone de verdade em:
 
-- tudo que for lancado no web aparece no app
-- tudo que for lancado no app aparece no web
-- o login e o mesmo
-- os dados continuam centralizados no servidor
+- [mobile/App.tsx](../mobile/App.tsx)
+- [mobile/src](../mobile/src)
 
-Hoje o app mobile foi preparado para consumir:
+Esse app:
+
+- usa frontend mobile proprio
+- conversa com a mesma API do Finora web
+- compartilha os mesmos usuarios, contas e lancamentos
+- nao depende de abrir o site dentro do app
+
+Em outras palavras: web e iPhone continuam sincronizados, mas cada um com sua experiencia de interface.
+
+## 2. Stack usada
+
+O app foi estruturado com:
+
+- `Expo`
+- `React Native`
+- `TypeScript`
+- `React Navigation`
+- `Expo Secure Store`
+
+Hoje a API base configurada esta em:
 
 ```text
 http://191.252.208.228:3333/api
 ```
 
-## 2. Tecnologia usada
+Esse valor esta em:
 
-O app foi preparado com:
+- [mobile/app.json](../mobile/app.json)
+- [mobile/src/lib/config.ts](../mobile/src/lib/config.ts)
 
-- `Capacitor`
-- `React`
-- `Vite`
+## 3. O que o app ja faz
 
-O frontend e empacotado dentro do app, e as requisicoes seguem para a API do seu servidor.
+### Autenticacao
 
-## 3. O que ja foi feito
+- login
+- criacao de conta
+- setup inicial
+- sessao persistida no aparelho
 
-- configuracao do `Capacitor`
-- projeto iOS criado na pasta `ios/`
-- build mobile com API apontando para o seu servidor
-- sincronizacao dos assets dentro do projeto iOS
-- ajustes de layout para uso no iPhone
-- navegacao rapida inferior no mobile
-- suporte a safe area
+### Dashboard nativo
 
-## 4. Arquivos principais
+- saude financeira
+- saldo total
+- previsto do mes
+- entradas e saidas
+- contas
+- alertas
+- categorias
+- cartoes
+- lancamentos recentes
 
-- [capacitor.config.ts](../capacitor.config.ts)
-- [src/api.js](../src/api.js)
-- [src/main.jsx](../src/main.jsx)
-- [src/styles.css](../src/styles.css)
-- [ios/App/App/Info.plist](../ios/App/App/Info.plist)
+### Lancamentos
 
-## 5. Comandos do projeto
+- listar por mes
+- buscar
+- filtrar por tipo
+- criar
+- editar
+- excluir
 
-### Build normal
+### Contas
+
+- listar contas
+- ver patrimonio consolidado
+- criar
+- editar
+- excluir
+
+### Area Mais
+
+- trocar moeda
+- ver orcamentos
+- ver metas
+- ver recorrencias
+- executar recorrencia manualmente
+- ver relatorios e comparativos
+- sair da conta
+
+## 4. Estrutura principal
+
+### App shell
+
+- [mobile/App.tsx](../mobile/App.tsx)
+
+Responsavel por:
+
+- tema
+- sessao
+- tabs principais
+- gate de autenticacao
+
+### Sessao e API
+
+- [mobile/src/lib/session.tsx](../mobile/src/lib/session.tsx)
+- [mobile/src/lib/api.ts](../mobile/src/lib/api.ts)
+- [mobile/src/lib/storage.ts](../mobile/src/lib/storage.ts)
+
+### Telas
+
+- [mobile/src/screens/AuthScreen.tsx](../mobile/src/screens/AuthScreen.tsx)
+- [mobile/src/screens/DashboardScreen.tsx](../mobile/src/screens/DashboardScreen.tsx)
+- [mobile/src/screens/TransactionsScreen.tsx](../mobile/src/screens/TransactionsScreen.tsx)
+- [mobile/src/screens/AccountsScreen.tsx](../mobile/src/screens/AccountsScreen.tsx)
+- [mobile/src/screens/MoreScreen.tsx](../mobile/src/screens/MoreScreen.tsx)
+
+### Componentes nativos
+
+- [mobile/src/components/ui.tsx](../mobile/src/components/ui.tsx)
+- [mobile/src/components/TransactionEditor.tsx](../mobile/src/components/TransactionEditor.tsx)
+- [mobile/src/components/AccountEditor.tsx](../mobile/src/components/AccountEditor.tsx)
+
+## 5. Comandos uteis
+
+Entre na pasta:
 
 ```bash
-npm run build
+cd mobile
 ```
 
-### Build para iPhone
+Instalar dependencias:
 
 ```bash
-npm run build:ios
+npm install
 ```
 
-### Sincronizar com o projeto iOS
+Rodar o Expo:
 
 ```bash
-npm run ios:sync
+npm run start
 ```
 
-## 6. Como abrir no Mac
+Rodar checagem de tipos:
 
-No Mac com Xcode instalado:
+```bash
+npm run typecheck
+```
+
+Gerar projeto iOS nativo no Mac:
+
+```bash
+npm run ios:prebuild
+```
+
+Abrir no simulador / Xcode:
+
+```bash
+npm run ios:run
+```
+
+## 6. Como abrir no Xcode
+
+No Mac:
 
 1. clone o repositorio
-2. instale dependencias com `npm install`
-3. rode `npm run ios:sync`
-4. abra:
+2. entre em `mobile`
+3. rode `npm install`
+4. rode `npm run ios:prebuild`
+5. abra o projeto iOS gerado na pasta:
 
 ```text
-ios/App/App.xcodeproj
+mobile/ios
 ```
 
-5. selecione um simulador ou iPhone fisico
-6. clique em Run no Xcode
+Normalmente o arquivo relevante sera um `.xcworkspace` ou `.xcodeproj`, gerado pelo Expo no prebuild.
+
+Depois:
+
+1. escolha seu time de assinatura Apple no Xcode
+2. selecione um simulador de iPhone ou aparelho fisico
+3. clique em `Run`
 
 ## 7. Observacao importante sobre HTTP
 
-Seu servidor atual esta em IP e HTTP, nao HTTPS.
+Hoje o app esta apontando para um IP em `HTTP`, nao `HTTPS`.
 
-Por isso eu deixei o `Info.plist` do iOS permitindo trafego sem HTTPS para teste. Isso funciona para desenvolvimento e testes internos, mas para publicacao mais seria o ideal e:
+Por isso a configuracao iOS foi deixada permissiva para testes internos.
 
-- usar dominio
-- ativar HTTPS
-- remover a excecao ampla de transporte no iOS
+Para publicacao mais seria, o ideal e:
 
-## 8. Layout mobile
+1. usar dominio
+2. ativar `HTTPS`
+3. trocar a API base para o dominio final
+4. reduzir ou remover a excecao ampla de transporte no iOS
 
-Para o iPhone, o app recebeu:
+## 8. Diferenca em relacao ao caminho antigo
 
-- encaixe melhor com safe area
-- espaco inferior para navegacao fixa
-- dock inferior com acesso rapido
-- menu lateral para areas secundarias
+Antes existia uma base com `Capacitor` empacotando o frontend web.
 
-## 9. Limites atuais
+Essa nova estrutura em `mobile/` e a base correta para o app iPhone nativo, porque:
 
-- o app ainda depende do servidor estar online
-- o app ainda nao tem biometria nativa
-- o app ainda nao tem push notification
-- o icone final do iOS pode ser refinado depois no Xcode
+- a navegacao e mobile-first
+- os componentes sao React Native
+- o layout foi pensado para toque, safe area e tabs de iPhone
+- o frontend nao depende de renderizar o site dentro do app
 
-## 10. Proximos passos recomendados
+## 9. Proximos passos recomendados
 
-- colocar a API em HTTPS com dominio
-- adicionar icones e splash nativos
-- opcionalmente adicionar biometria
-- opcionalmente adicionar notificacoes push
+Antes de publicar na App Store, eu recomendo:
+
+1. colocar a API em `HTTPS`
+2. definir icone e splash finais
+3. adicionar biometria
+4. adicionar push notifications
+5. adicionar modo offline parcial
+6. criar uma pipeline de build iOS
