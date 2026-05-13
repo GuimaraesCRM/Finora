@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { NavigationContainer, DefaultTheme, DarkTheme } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ActivityIndicator, Text, View, useColorScheme } from "react-native";
 import { SessionProvider, useSession } from "./src/lib/session";
 import { usePalette } from "./src/theme";
@@ -79,10 +80,12 @@ function AppShell() {
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <SessionProvider>
-        <AppShell />
-      </SessionProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <SessionProvider>
+          <AppShell />
+        </SessionProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

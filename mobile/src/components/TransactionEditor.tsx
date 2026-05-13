@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { Modal, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { usePalette } from "../theme";
 import type { Account, Category, Transaction } from "../types/api";
-import { today } from "../lib/utils";
+import { formatDate, today } from "../lib/utils";
 import { Chip, LabeledField, PrimaryButton, SelectorModal } from "./ui";
 
 type TransactionFormValue = {
@@ -53,7 +53,8 @@ export function TransactionEditor({
   const palette = usePalette();
   const [form, setForm] = useState<TransactionFormValue>(() => blankForm(accounts, categories));
   const [saving, setSaving] = useState(false);
-  const [showDate, setShowDate] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [draftDate, setDraftDate] = useState(new Date());
   const [accountPicker, setAccountPicker] = useState(false);
   const [categoryPicker, setCategoryPicker] = useState(false);
   const [transferPicker, setTransferPicker] = useState(false);
@@ -64,29 +65,31 @@ export function TransactionEditor({
   const category = availableCategories.find((item) => item.id === form.categoryId);
 
   useEffect(() => {
-    if (visible) {
-      if (transaction) {
-        setForm({
-          id: transaction.id,
-          description: transaction.description,
-          amount: String(transaction.amount),
-          date: transaction.date,
-          type: transaction.type,
-          status: transaction.status,
-          accountId: transaction.accountId,
-          transferAccountId: transaction.transferAccountId,
-          categoryId: transaction.categoryId,
-          tags: transaction.tags || "",
-          notes: transaction.notes || "",
-        });
-      } else {
-        setForm(blankForm(accounts, categories));
-      }
+    if (!visible) return;
+    if (transaction) {
+      setForm({
+        id: transaction.id,
+        description: transaction.description,
+        amount: String(transaction.amount),
+        date: transaction.date,
+        type: transaction.type,
+        status: transaction.status,
+        accountId: transaction.accountId,
+        transferAccountId: transaction.transferAccountId,
+        categoryId: transaction.categoryId,
+        tags: transaction.tags || "",
+        notes: transaction.notes || "",
+      });
+      setDraftDate(new Date(`${transaction.date}T12:00:00`));
+      return;
     }
+    const next = blankForm(accounts, categories);
+    setForm(next);
+    setDraftDate(new Date(`${next.date}T12:00:00`));
   }, [visible, transaction, accounts, categories]);
 
   const accountOptions = useMemo(
-    () => accounts.map((item) => ({ value: item.id, label: item.name, meta: item.type })),
+    () => accounts.map((item) => ({ value: item.id, label: item.name, meta: accountMeta(item) })),
     [accounts]
   );
 
@@ -95,7 +98,15 @@ export function TransactionEditor({
     [availableCategories]
   );
 
+  const canSave = Boolean(
+    form.description.trim() &&
+    form.amount &&
+    form.accountId &&
+    (form.type === "transfer" ? form.transferAccountId : form.categoryId || availableCategories.length === 0)
+  );
+
   async function save() {
+    if (!canSave) return;
     setSaving(true);
     try {
       await onSubmit({
@@ -106,7 +117,7 @@ export function TransactionEditor({
         type: form.type,
         status: form.status,
         description: form.description.trim(),
-        amount: Number(form.amount || 0),
+        amount: Number(String(form.amount).replace(",", ".")),
         date: form.date,
         tags: form.tags,
         notes: form.notes,
@@ -119,106 +130,150 @@ export function TransactionEditor({
     }
   }
 
+  function openDatePicker() {
+    setDraftDate(new Date(`${form.date}T12:00:00`));
+    setShowDatePicker(true);
+  }
+
   return (
     <>
       <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-        <View style={[styles.layer, { backgroundColor: "rgba(0,0,0,0.42)" }]}>
-          <View style={[styles.sheet, { backgroundColor: palette.surface }]}>
-            <View style={styles.header}>
-              <View>
-                <Text style={{ color: palette.text, fontSize: 22, fontWeight: "800" }}>{form.id ? "Editar lancamento" : "Novo lancamento"}</Text>
-                <Text style={{ color: palette.muted, marginTop: 6 }}>Versao mobile nativa do Finora</Text>
-              </View>
-              <Pressable onPress={onClose}>
-                <Ionicons name="close" size={24} color={palette.text} />
-              </Pressable>
-            </View>
-
-            <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 20 }}>
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                <Chip label="Despesa" active={form.type === "expense"} onPress={() => setForm((current) => ({ ...current, type: "expense", categoryId: firstCategory(categories, "expense"), transferAccountId: null }))} />
-                <Chip label="Receita" active={form.type === "income"} onPress={() => setForm((current) => ({ ...current, type: "income", categoryId: firstCategory(categories, "income"), transferAccountId: null }))} />
-                <Chip label="Transferencia" active={form.type === "transfer"} onPress={() => setForm((current) => ({ ...current, type: "transfer", categoryId: null }))} />
-              </View>
-
-              <LabeledField label="Descricao" value={form.description} onChangeText={(description) => setForm((current) => ({ ...current, description }))} placeholder="Ex.: Mercado, aluguel, salario..." />
-              <View style={{ flexDirection: "row", gap: 12 }}>
+        <View style={[styles.layer, { backgroundColor: "rgba(0,0,0,0.45)" }]}>
+          <Pressable style={{ flex: 1 }} onPress={onClose} />
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+            <View style={[styles.sheet, { backgroundColor: palette.surface }]}>
+              <View style={styles.header}>
                 <View style={{ flex: 1 }}>
-                  <LabeledField label="Valor" value={form.amount} onChangeText={(amount) => setForm((current) => ({ ...current, amount }))} keyboardType="numeric" placeholder="0,00" />
+                  <Text style={{ color: palette.text, fontSize: 24, fontWeight: "900" }}>{form.id ? "Editar lancamento" : "Novo lancamento"}</Text>
+                  <Text style={{ color: palette.muted, marginTop: 6 }}>Agora com fluxo de toque mais nativo e direto no iPhone.</Text>
                 </View>
-                <View style={{ flex: 1, gap: 8 }}>
-                  <Text style={{ color: palette.muted, fontWeight: "700" }}>Data</Text>
-                  <Pressable
-                    onPress={() => setShowDate(true)}
-                    style={[styles.selector, { backgroundColor: palette.surfaceStrong, borderColor: palette.border }]}
-                  >
-                    <Text style={{ color: palette.text, fontSize: 16 }}>{form.date}</Text>
-                    <Ionicons name="calendar-outline" size={18} color={palette.text} />
-                  </Pressable>
-                </View>
-              </View>
-
-              <View style={{ gap: 8 }}>
-                <Text style={{ color: palette.muted, fontWeight: "700" }}>Conta</Text>
-                <Pressable onPress={() => setAccountPicker(true)} style={[styles.selector, { backgroundColor: palette.surfaceStrong, borderColor: palette.border }]}>
-                  <Text style={{ color: palette.text, fontSize: 16 }}>{account?.name || "Selecione"}</Text>
-                  <Ionicons name="chevron-forward" size={18} color={palette.text} />
+                <Pressable onPress={onClose} hitSlop={12}>
+                  <Ionicons name="close" size={24} color={palette.text} />
                 </Pressable>
               </View>
 
-              {form.type !== "transfer" ? (
-                <View style={{ gap: 8 }}>
-                  <Text style={{ color: palette.muted, fontWeight: "700" }}>Categoria</Text>
-                  <Pressable onPress={() => setCategoryPicker(true)} style={[styles.selector, { backgroundColor: palette.surfaceStrong, borderColor: palette.border }]}>
-                    <Text style={{ color: palette.text, fontSize: 16 }}>{category?.name || "Selecione"}</Text>
-                    <Ionicons name="chevron-forward" size={18} color={palette.text} />
-                  </Pressable>
+              <ScrollView
+                contentContainerStyle={{ gap: 16, paddingBottom: 22 }}
+                keyboardShouldPersistTaps="always"
+                keyboardDismissMode="on-drag"
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                  <Chip label="Despesa" active={form.type === "expense"} onPress={() => setForm((current) => ({ ...current, type: "expense", categoryId: firstCategory(categories, "expense"), transferAccountId: null }))} />
+                  <Chip label="Receita" active={form.type === "income"} onPress={() => setForm((current) => ({ ...current, type: "income", categoryId: firstCategory(categories, "income"), transferAccountId: null }))} />
+                  <Chip label="Transferencia" active={form.type === "transfer"} onPress={() => setForm((current) => ({ ...current, type: "transfer", categoryId: null, transferAccountId: accounts.find((item) => item.id !== current.accountId)?.id || null }))} />
                 </View>
-              ) : (
-                <View style={{ gap: 8 }}>
-                  <Text style={{ color: palette.muted, fontWeight: "700" }}>Conta destino</Text>
-                  <Pressable onPress={() => setTransferPicker(true)} style={[styles.selector, { backgroundColor: palette.surfaceStrong, borderColor: palette.border }]}>
-                    <Text style={{ color: palette.text, fontSize: 16 }}>{transferAccount?.name || "Selecione"}</Text>
-                    <Ionicons name="chevron-forward" size={18} color={palette.text} />
-                  </Pressable>
-                </View>
-              )}
 
-              <View style={[styles.statusRow, { backgroundColor: palette.surfaceStrong, borderColor: palette.border }]}>
-                <Text style={{ color: palette.text, fontSize: 15, fontWeight: "700" }}>Pago</Text>
-                <Switch
-                  value={form.status === "paid"}
-                  onValueChange={(next) => setForm((current) => ({ ...current, status: next ? "paid" : "pending" }))}
-                  trackColor={{ false: palette.border, true: palette.primary }}
-                  thumbColor="#ffffff"
+                <LabeledField
+                  label="Descricao"
+                  value={form.description}
+                  onChangeText={(description) => setForm((current) => ({ ...current, description }))}
+                  placeholder="Ex.: Mercado, aluguel, salario..."
                 />
-              </View>
 
-              <LabeledField label="Tags" value={form.tags} onChangeText={(tags) => setForm((current) => ({ ...current, tags }))} placeholder="casa, mercado, lazer" />
-              <LabeledField label="Observacoes" value={form.notes} onChangeText={(notes) => setForm((current) => ({ ...current, notes }))} multiline placeholder="Algo importante sobre esse lancamento" />
+                <LabeledField
+                  label="Valor"
+                  value={form.amount}
+                  onChangeText={(amount) => setForm((current) => ({ ...current, amount }))}
+                  keyboardType="numeric"
+                  placeholder="0,00"
+                />
 
-              <PrimaryButton label={saving ? "Salvando..." : "Salvar lancamento"} onPress={save} icon="save-outline" disabled={saving || !form.description.trim() || !form.amount || !form.accountId} />
-            </ScrollView>
-          </View>
+                <SelectRow
+                  label="Data"
+                  value={formatDate(form.date)}
+                  icon="calendar-outline"
+                  onPress={openDatePicker}
+                />
+
+                <SelectRow
+                  label={form.type === "transfer" ? "Conta de origem" : "Conta"}
+                  value={account?.name || "Selecione a conta"}
+                  icon="wallet-outline"
+                  onPress={() => setAccountPicker(true)}
+                />
+
+                {form.type !== "transfer" ? (
+                  <SelectRow
+                    label="Categoria"
+                    value={category?.name || "Selecione a categoria"}
+                    icon="pricetag-outline"
+                    onPress={() => setCategoryPicker(true)}
+                  />
+                ) : (
+                  <SelectRow
+                    label="Conta destino"
+                    value={transferAccount?.name || "Selecione a conta destino"}
+                    icon="swap-horizontal-outline"
+                    onPress={() => setTransferPicker(true)}
+                  />
+                )}
+
+                <View style={{ gap: 8 }}>
+                  <Text style={{ color: palette.muted, fontWeight: "700" }}>Status</Text>
+                  <View style={{ flexDirection: "row", gap: 10 }}>
+                    <StatusOption
+                      label="Pago"
+                      active={form.status === "paid"}
+                      icon="checkmark-circle-outline"
+                      onPress={() => setForm((current) => ({ ...current, status: "paid" }))}
+                    />
+                    <StatusOption
+                      label="Pendente"
+                      active={form.status === "pending"}
+                      icon="time-outline"
+                      onPress={() => setForm((current) => ({ ...current, status: "pending" }))}
+                    />
+                  </View>
+                </View>
+
+                <LabeledField label="Tags" value={form.tags} onChangeText={(tags) => setForm((current) => ({ ...current, tags }))} placeholder="casa, mercado, lazer" />
+                <LabeledField label="Observacoes" value={form.notes} onChangeText={(notes) => setForm((current) => ({ ...current, notes }))} multiline placeholder="Observacoes do lancamento" />
+
+                <PrimaryButton
+                  label={saving ? "Salvando..." : form.id ? "Salvar alteracoes" : "Criar lancamento"}
+                  onPress={save}
+                  icon="save-outline"
+                  disabled={saving || !canSave}
+                />
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
-      {showDate && (
-        <DateTimePicker
-          value={new Date(`${form.date}T00:00:00`)}
-          mode="date"
-          display="default"
-          onChange={(_event, date) => {
-            setShowDate(false);
-            if (date) {
-              setForm((current) => ({ ...current, date: date.toISOString().slice(0, 10) }));
-            }
-          }}
-        />
-      )}
+      <DatePickerSheet
+        visible={showDatePicker}
+        value={draftDate}
+        onChange={setDraftDate}
+        onCancel={() => setShowDatePicker(false)}
+        onConfirm={() => {
+          setForm((current) => ({ ...current, date: draftDate.toISOString().slice(0, 10) }));
+          setShowDatePicker(false);
+        }}
+      />
 
-      <SelectorModal visible={accountPicker} title="Escolha a conta" options={accountOptions} selectedValue={form.accountId} onSelect={(value) => setForm((current) => ({ ...current, accountId: value }))} onClose={() => setAccountPicker(false)} />
-      <SelectorModal visible={categoryPicker} title="Escolha a categoria" options={categoryOptions} selectedValue={form.categoryId} onSelect={(value) => setForm((current) => ({ ...current, categoryId: value }))} onClose={() => setCategoryPicker(false)} />
+      <SelectorModal
+        visible={accountPicker}
+        title="Escolha a conta"
+        options={accountOptions}
+        selectedValue={form.accountId}
+        onSelect={(value) => {
+          const nextTransfer = value === form.transferAccountId ? accounts.find((item) => item.id !== value)?.id || null : form.transferAccountId;
+          setForm((current) => ({ ...current, accountId: value, transferAccountId: nextTransfer }));
+        }}
+        onClose={() => setAccountPicker(false)}
+      />
+
+      <SelectorModal
+        visible={categoryPicker}
+        title="Escolha a categoria"
+        options={categoryOptions}
+        selectedValue={form.categoryId}
+        onSelect={(value) => setForm((current) => ({ ...current, categoryId: value }))}
+        onClose={() => setCategoryPicker(false)}
+      />
+
       <SelectorModal
         visible={transferPicker}
         title="Conta destino"
@@ -228,6 +283,140 @@ export function TransactionEditor({
         onClose={() => setTransferPicker(false)}
       />
     </>
+  );
+}
+
+function SelectRow({
+  label,
+  value,
+  icon,
+  onPress,
+}: {
+  label: string;
+  value: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  onPress: () => void;
+}) {
+  const palette = usePalette();
+
+  return (
+    <View style={{ gap: 8 }}>
+      <Text style={{ color: palette.muted, fontWeight: "700" }}>{label}</Text>
+      <Pressable
+        onPress={onPress}
+        hitSlop={10}
+        style={({ pressed }) => [
+          styles.selector,
+          {
+            backgroundColor: palette.surfaceStrong,
+            borderColor: palette.border,
+            opacity: pressed ? 0.9 : 1,
+          },
+        ]}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
+          <View style={[styles.selectorIcon, { backgroundColor: palette.primarySoft }]}>
+            <Ionicons name={icon} size={18} color={palette.primary} />
+          </View>
+          <Text style={{ color: palette.text, fontSize: 16, fontWeight: "700", flex: 1 }}>{value}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={palette.text} />
+      </Pressable>
+    </View>
+  );
+}
+
+function StatusOption({
+  label,
+  icon,
+  active,
+  onPress,
+}: {
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const palette = usePalette();
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={10}
+      style={({ pressed }) => [
+        styles.statusOption,
+        {
+          backgroundColor: active ? palette.primarySoft : palette.surfaceStrong,
+          borderColor: active ? palette.primary : palette.border,
+          opacity: pressed ? 0.9 : 1,
+        },
+      ]}
+    >
+      <Ionicons name={icon} size={18} color={active ? palette.primary : palette.muted} />
+      <Text style={{ color: active ? palette.primary : palette.text, fontWeight: "800" }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function DatePickerSheet({
+  visible,
+  value,
+  onChange,
+  onCancel,
+  onConfirm,
+}: {
+  visible: boolean;
+  value: Date;
+  onChange: (value: Date) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const palette = usePalette();
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onCancel}>
+      <View style={[styles.layer, { backgroundColor: "rgba(0,0,0,0.45)" }]}>
+        <Pressable style={{ flex: 1 }} onPress={onCancel} />
+        <View style={[styles.sheet, { backgroundColor: palette.surface, maxHeight: 360 }]}>
+          <View style={styles.header}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: palette.text, fontSize: 22, fontWeight: "900" }}>Escolha a data</Text>
+              <Text style={{ color: palette.muted, marginTop: 6 }}>Confirme antes de voltar para o lancamento.</Text>
+            </View>
+            <Pressable onPress={onCancel} hitSlop={12}>
+              <Ionicons name="close" size={24} color={palette.text} />
+            </Pressable>
+          </View>
+
+          <View style={{ alignItems: "center", marginTop: 8 }}>
+            <DateTimePicker
+              value={value}
+              mode="date"
+              display={Platform.OS === "ios" ? "spinner" : "default"}
+              onChange={(_event, nextValue) => {
+                if (nextValue) onChange(nextValue);
+              }}
+            />
+          </View>
+
+          <View style={{ flexDirection: "row", gap: 10, marginTop: 18 }}>
+            <View style={{ flex: 1 }}>
+              <Pressable
+                onPress={onCancel}
+                style={({ pressed }) => [
+                  styles.secondaryButton,
+                  { backgroundColor: palette.surfaceSoft, opacity: pressed ? 0.9 : 1 },
+                ]}
+              >
+                <Text style={{ color: palette.text, fontWeight: "800" }}>Cancelar</Text>
+              </Pressable>
+            </View>
+            <View style={{ flex: 1 }}>
+              <PrimaryButton label="Confirmar" onPress={onConfirm} icon="checkmark-outline" />
+            </View>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -250,6 +439,14 @@ function firstCategory(categories: Category[], type: "income" | "expense") {
   return categories.find((item) => item.type === type)?.id || null;
 }
 
+function accountMeta(item: Account) {
+  if (item.type === "credit") return "Cartao";
+  if (item.type === "checking") return "Conta corrente";
+  if (item.type === "savings") return "Poupanca";
+  if (item.type === "investment") return "Investimento";
+  return "Dinheiro";
+}
+
 const styles = StyleSheet.create({
   layer: {
     flex: 1,
@@ -266,23 +463,41 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12,
     marginBottom: 18,
+    alignItems: "flex-start",
   },
   selector: {
+    minHeight: 62,
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  selectorIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statusOption: {
+    minHeight: 56,
+    flex: 1,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  secondaryButton: {
     minHeight: 54,
     borderRadius: 18,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-  },
-  statusRow: {
-    minHeight: 60,
-    borderRadius: 18,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
+    paddingHorizontal: 18,
   },
 });

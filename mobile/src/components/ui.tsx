@@ -11,7 +11,12 @@ export function Screen({ title, subtitle, action, children }: { title: string; s
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }} edges={["top", "left", "right"]}>
-      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 120, gap: 16 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{ padding: 18, paddingBottom: 120, gap: 16 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="always"
+        keyboardDismissMode="on-drag"
+      >
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.title, { color: palette.text }]}>{title}</Text>
@@ -195,14 +200,15 @@ export function SelectorModal({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={[styles.modalLayer, { backgroundColor: "rgba(0,0,0,0.45)" }]}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
         <View style={[styles.modalCard, { backgroundColor: palette.surface }]}>
           <View style={[styles.rowBetween, { marginBottom: 14 }]}>
             <Text style={{ color: palette.text, fontSize: 18, fontWeight: "800" }}>{title}</Text>
-            <Pressable onPress={onClose}>
+            <Pressable onPress={onClose} hitSlop={12}>
               <Ionicons name="close" size={22} color={palette.text} />
             </Pressable>
           </View>
-          <ScrollView style={{ maxHeight: 420 }}>
+          <ScrollView style={{ maxHeight: 420 }} keyboardShouldPersistTaps="always">
             {options.map((option) => (
               <Pressable
                 key={option.value}
@@ -210,6 +216,7 @@ export function SelectorModal({
                   onSelect(option.value);
                   onClose();
                 }}
+                hitSlop={8}
                 style={({ pressed }) => [
                   styles.optionRow,
                   {

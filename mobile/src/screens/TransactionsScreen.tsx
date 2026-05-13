@@ -146,7 +146,7 @@ export function TransactionsScreen() {
     <>
       <Screen
         title="Lancamentos"
-        subtitle="Fluxo nativo para criar, editar e acompanhar movimentacoes."
+        subtitle="Tela refeita para iPhone, com edicao e exclusao mais simples no toque."
         action={<GhostButton label="Novo" onPress={createTransaction} icon="add-outline" />}
       >
         <MonthSwitcher month={month} currency={session.user?.currency || "BRL"} onChange={setMonth} />
@@ -170,29 +170,35 @@ export function TransactionsScreen() {
         ) : visibleTransactions.length ? (
           <View style={{ gap: 10 }}>
             {visibleTransactions.map((transaction) => (
-              <SurfaceCard key={transaction.id} style={{ padding: 16 }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <Text style={{ color: palette.text, fontWeight: "800", fontSize: 16, flexShrink: 1 }}>{transaction.description}</Text>
-                      <TagBadge label={transaction.status === "paid" ? "Pago" : "Pendente"} tone={transaction.status === "paid" ? "good" : "warning"} />
+              <Pressable key={transaction.id} onPress={() => editTransaction(transaction)} hitSlop={8}>
+                <SurfaceCard style={{ padding: 16 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <Text style={{ color: palette.text, fontWeight: "800", fontSize: 16, flexShrink: 1 }}>{transaction.description}</Text>
+                        <TagBadge label={transaction.status === "paid" ? "Pago" : "Pendente"} tone={transaction.status === "paid" ? "good" : "warning"} />
+                      </View>
+                      <Text style={{ color: palette.muted, marginTop: 8, fontSize: 13 }}>
+                        {formatDate(transaction.date)} · {transaction.account?.name || "Conta"} · {detailLabel(transaction)}
+                      </Text>
+                      {!!transaction.tags && <Text style={{ color: palette.muted, marginTop: 6, fontSize: 12 }}>#{transaction.tags.replaceAll(",", " #")}</Text>}
                     </View>
-                    <Text style={{ color: palette.muted, marginTop: 8, fontSize: 13 }}>
-                      {formatDate(transaction.date)} · {transaction.account?.name || "Conta"} · {detailLabel(transaction)}
-                    </Text>
-                    {!!transaction.tags && <Text style={{ color: palette.muted, marginTop: 6, fontSize: 12 }}>#{transaction.tags.replaceAll(",", " #")}</Text>}
-                  </View>
-                  <View style={{ alignItems: "flex-end", gap: 12 }}>
-                    <Text style={{ color: amountColor(transaction.type, palette), fontWeight: "900", fontSize: 16 }}>
-                      {signedAmount(transaction, session.user?.currency || "BRL")}
-                    </Text>
-                    <View style={{ flexDirection: "row", gap: 10 }}>
-                      <MiniAction icon="create-outline" onPress={() => editTransaction(transaction)} />
-                      <MiniAction icon="trash-outline" onPress={() => deleteTransaction(transaction)} tone="bad" />
+                    <View style={{ alignItems: "flex-end", gap: 12 }}>
+                      <Text style={{ color: amountColor(transaction.type, palette), fontWeight: "900", fontSize: 16 }}>
+                        {signedAmount(transaction, session.user?.currency || "BRL")}
+                      </Text>
+                      <View style={{ paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, backgroundColor: palette.primarySoft }}>
+                        <Text style={{ color: palette.primary, fontSize: 12, fontWeight: "800" }}>Toque para editar</Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-              </SurfaceCard>
+
+                  <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+                    <RowAction label="Editar" icon="create-outline" onPress={() => editTransaction(transaction)} />
+                    <RowAction label="Excluir" icon="trash-outline" onPress={() => deleteTransaction(transaction)} tone="bad" />
+                  </View>
+                </SurfaceCard>
+              </Pressable>
             ))}
           </View>
         ) : (
@@ -236,11 +242,13 @@ function TagBadge({ label, tone = "default" }: { label: string; tone?: "default"
   );
 }
 
-function MiniAction({
+function RowAction({
+  label,
   icon,
   onPress,
   tone = "default",
 }: {
+  label: string;
   icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
   tone?: "default" | "bad";
@@ -251,17 +259,21 @@ function MiniAction({
   return (
     <Pressable
       onPress={onPress}
+      hitSlop={8}
       style={({ pressed }) => ({
-        width: 34,
-        height: 34,
-        borderRadius: 12,
+        minHeight: 44,
+        flex: 1,
+        borderRadius: 14,
         backgroundColor: palette.surfaceSoft,
         alignItems: "center",
         justifyContent: "center",
+        flexDirection: "row",
+        gap: 8,
         opacity: pressed ? 0.8 : 1,
       })}
     >
       <Ionicons name={icon} size={17} color={color} />
+      <Text style={{ color, fontWeight: "800" }}>{label}</Text>
     </Pressable>
   );
 }
