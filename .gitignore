@@ -1,0 +1,13 @@
+.chrome-check/
+.chrome-test/
+node_modules/
+dist/
+logs/
+.env
+.env.local
+prisma/data/
+*.db
+*.sqlite
+*.sqlite3
+Thumbs.db
+.DS_Store
