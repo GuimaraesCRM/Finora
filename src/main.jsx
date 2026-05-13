@@ -328,12 +328,9 @@ function App() {
   return (
     <div className="app-shell">
       <aside className={`sidebar ${menuOpen ? "open" : ""}`}>
-        <div className="brand">
-          <div className="brand-mark"><PiggyBank size={24} /></div>
-          <div>
-            <strong>Finora</strong>
-            <span>{user.name}</span>
-          </div>
+        <div className="brand brand-stack">
+          <img className="brand-logo" src="/finora-logo.png" alt="Finora" />
+          <span className="brand-subtitle">{user.name}</span>
         </div>
         <nav>
           {navItems.map((item) => {
@@ -445,12 +442,9 @@ function AuthScreen({ mode, onDone, showToast, theme, setTheme }) {
     <main className="auth-page">
       <section className="auth-panel">
         <div className="auth-topline">
-          <div className="brand auth-brand">
-            <div className="brand-mark"><PiggyBank size={26} /></div>
-            <div>
-              <strong>Finora</strong>
-              <span>Controle financeiro pessoal</span>
-            </div>
+          <div className="brand auth-brand brand-stack">
+            <img className="brand-logo brand-logo-auth" src="/finora-logo.png" alt="Finora" />
+            <span className="brand-subtitle">Controle financeiro pessoal</span>
           </div>
           <button className="icon-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Alternar tema">
             {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}

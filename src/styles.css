@@ -96,6 +96,21 @@ button {
   gap: 12px;
 }
 
+.brand-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.brand-logo {
+  display: block;
+  width: min(190px, 100%);
+  height: auto;
+}
+
+.brand-logo-auth {
+  width: min(220px, 100%);
+}
+
 .brand-mark {
   display: grid;
   width: 44px;
@@ -110,6 +125,12 @@ button {
 .brand strong,
 .brand span {
   display: block;
+}
+
+.brand-subtitle {
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 700;
 }
 
 .brand span,

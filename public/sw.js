@@ -1,5 +1,5 @@
-const CACHE = "finora-v2";
-const ASSETS = ["/", "/manifest.webmanifest", "/icon.svg"];
+const CACHE = "finora-v3";
+const ASSETS = ["/", "/manifest.webmanifest", "/finora-icon.png", "/finora-logo.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)));
