@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { usePalette } from "../theme";
 import type { Account, Category, Transaction } from "../types/api";
 import { accountTypeLabel, formatDate, today } from "../lib/utils";
-import { Chip, LabeledField, PrimaryButton } from "./ui";
+import { Chip, GhostButton, LabeledField, PrimaryButton } from "./ui";
 
 type Panel = "date" | "account" | "category" | "transfer" | null;
 
@@ -140,15 +140,16 @@ export function TransactionEditor({
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: palette.background }} edges={["top", "left", "right", "bottom"]}>
         <View style={[styles.header, { borderBottomColor: palette.border, backgroundColor: palette.surface }]}>
-          <Pressable onPress={onClose} hitSlop={10} style={styles.headerButton}>
-            <Ionicons name="close" size={22} color={palette.text} />
+          <Pressable onPress={onClose} hitSlop={12} style={({ pressed }) => [styles.backButton, { backgroundColor: palette.surfaceSoft, opacity: pressed ? 0.85 : 1 }]}>
+            <Ionicons name="chevron-back" size={18} color={palette.text} />
+            <Text style={{ color: palette.text, fontWeight: "800" }}>Voltar</Text>
           </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={{ color: palette.text, fontSize: 20, fontWeight: "900", textAlign: "center" }}>
               {form.id ? "Editar lancamento" : "Novo lancamento"}
             </Text>
           </View>
-          <View style={styles.headerButton} />
+          <View style={styles.backButtonSpacer} />
         </View>
 
         <ScrollView
@@ -285,7 +286,14 @@ export function TransactionEditor({
         </ScrollView>
 
         <View style={[styles.footer, { backgroundColor: palette.surface, borderTopColor: palette.border }]}>
-          <PrimaryButton label={saving ? "Salvando..." : form.id ? "Salvar alteracoes" : "Criar lancamento"} onPress={save} icon="save-outline" disabled={saving || !canSave} />
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <GhostButton label="Cancelar" onPress={onClose} icon="close-outline" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <PrimaryButton label={saving ? "Salvando..." : form.id ? "Salvar" : "Criar"} onPress={save} icon="save-outline" disabled={saving || !canSave} />
+            </View>
+          </View>
         </View>
       </SafeAreaView>
     </Modal>
@@ -425,12 +433,20 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     borderBottomWidth: 1,
     paddingHorizontal: 12,
+    gap: 12,
   },
-  headerButton: {
-    width: 32,
-    height: 32,
+  backButton: {
+    minHeight: 40,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 4,
+    zIndex: 2,
+  },
+  backButtonSpacer: {
+    width: 82,
   },
   expanderCard: {
     borderRadius: 20,
