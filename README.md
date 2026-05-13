@@ -88,6 +88,7 @@ Copie `.env.example` para `.env` e ajuste:
 
 - [Guia Completo](./docs/GUIA_COMPLETO.md)
 - [Deploy Linux](./docs/DEPLOY_LINUX.md)
+- [App iPhone](./docs/IPHONE_APP.md)
 
 ## Observacoes importantes
 
@@ -95,3 +96,4 @@ Copie `.env.example` para `.env` e ajuste:
 - PDFs escaneados como imagem ainda exigem OCR.
 - O banco padrao e SQLite, bom para uso pessoal e pequeno volume.
 - Para producao com varios acessos reais, vale considerar migracao futura para PostgreSQL.
+- O projeto agora possui base `Capacitor` e pasta `ios/` para gerar o app de iPhone.

@@ -51,7 +51,7 @@ import {
   YAxis,
 } from "recharts";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
-import { apiRequest, apiUrl } from "./api.js";
+import { apiRequest, apiUrl, nativeApp } from "./api.js";
 import "./styles.css";
 
 const navItems = [
@@ -103,7 +103,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [setupRequired, setSetupRequired] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [section, setSection] = useState("dashboard");
+  const [section, setSection] = useState(localStorage.getItem("finora-section") || "dashboard");
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -115,6 +115,7 @@ function App() {
   const currency = user?.currency || "BRL";
   const expenseCategories = data.categories.filter((item) => item.type === "expense");
   const incomeCategories = data.categories.filter((item) => item.type === "income");
+  const mobileDockItems = useMemo(() => navItems.filter((item) => ["dashboard", "transactions", "accounts", "reports"].includes(item.id)), []);
 
   useEffect(() => {
     boot();
@@ -129,6 +130,10 @@ function App() {
   useEffect(() => {
     if (token) loadData();
   }, [token, month, filters.type, filters.accountId]);
+
+  useEffect(() => {
+    localStorage.setItem("finora-section", section);
+  }, [section]);
 
   async function boot() {
     try {
@@ -246,6 +251,8 @@ function App() {
     downloadBackup,
     theme,
     setTheme,
+    apiUrl,
+    nativeApp,
   };
 
   if (loading) return <FullLoader />;
@@ -314,6 +321,22 @@ function App() {
         {section === "networth" && <NetWorth {...appContext} />}
         {section === "settings" && <SettingsView {...appContext} />}
       </main>
+
+      <nav className="mobile-dock" aria-label="Navegação rápida">
+        {mobileDockItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <button key={item.id} className={`mobile-dock-item ${section === item.id ? "active" : ""}`} onClick={() => setSection(item.id)}>
+              <Icon size={19} />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+        <button className={`mobile-dock-item ${menuOpen ? "active" : ""}`} onClick={() => setMenuOpen(true)}>
+          <Menu size={19} />
+          <span>Mais</span>
+        </button>
+      </nav>
 
       {menuOpen && <button className="scrim" onClick={() => setMenuOpen(false)} aria-label="Fechar menu" />}
       <div className={`toast ${toast ? "show" : ""}`}>{toast}</div>
@@ -928,7 +951,7 @@ function NetWorth({ data, currency }) {
   );
 }
 
-function SettingsView({ user, setUser, currency, theme, setTheme, downloadBackup, data, loadData, showToast }) {
+function SettingsView({ user, setUser, currency, theme, setTheme, downloadBackup, data, loadData, showToast, apiUrl, nativeApp }) {
   const [currencyForm, setCurrencyForm] = useState(currency);
   const [importAccountId, setImportAccountId] = useState("");
 
@@ -986,6 +1009,12 @@ function SettingsView({ user, setUser, currency, theme, setTheme, downloadBackup
             <strong>Acesso pelo celular</strong>
             <span>Com o servidor ativo, abra no telefone usando o IP da sua máquina e a porta 3333.</span>
           </div>
+          {nativeApp && (
+            <div className="info-box">
+              <strong>API do app</strong>
+              <span>{apiUrl}</span>
+            </div>
+          )}
         </div>
       </Panel>
     </div>
