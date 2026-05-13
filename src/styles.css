@@ -102,6 +102,15 @@ button {
   justify-items: start;
 }
 
+.brand-icon {
+  display: block;
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  border-radius: 10px;
+  flex: 0 0 auto;
+}
+
 .brand-logo {
   display: block;
   width: min(190px, 100%);

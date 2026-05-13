@@ -328,9 +328,12 @@ function App() {
   return (
     <div className="app-shell">
       <aside className={`sidebar ${menuOpen ? "open" : ""}`}>
-        <div className="brand brand-stack">
-          <img className="brand-logo" src="/finora-logo.png" alt="Finora" />
-          <span className="brand-subtitle">{user.name}</span>
+        <div className="brand">
+          <img className="brand-icon" src="/finora-icon.png" alt="Finora" />
+          <div>
+            <strong>Finora</strong>
+            <span>{user.name}</span>
+          </div>
         </div>
         <nav>
           {navItems.map((item) => {
