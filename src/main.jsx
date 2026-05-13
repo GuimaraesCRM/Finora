@@ -50,7 +50,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
 import { apiRequest, apiUrl, nativeApp } from "./api.js";
 import "./styles.css";
 
@@ -96,7 +95,6 @@ const monthNames = [
 ];
 
 const palette = ["#0f8f88", "#f97316", "#7257c5", "#d84a3a", "#3266c7", "#168a4a", "#c98214", "#e05c9f"];
-let pdfWorkerConfigured = false;
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem("finora-token") || "");
@@ -675,6 +673,15 @@ function Accounts({ data, currency, mutate }) {
     setOpen(true);
   }
 
+  async function remove(account) {
+    if (!confirm(`Excluir a conta "${account.name}"?`)) return;
+    await mutate(`/accounts/${account.id}`, { method: "DELETE" }, "Conta removida da lista. Se havia vínculos, ela foi arquivada automaticamente.");
+    if (form.id === account.id) {
+      setForm(blank());
+      setOpen(false);
+    }
+  }
+
   return (
     <>
       <Panel title="Minhas contas" subtitle="Saldos calculados pelo banco" action={<button className="primary-button" onClick={() => { setForm(blank()); setOpen(true); }}><Plus size={18} /> Nova conta</button>}>
@@ -683,7 +690,10 @@ function Accounts({ data, currency, mutate }) {
             <article className="account-card" style={{ "--card-color": account.color }} key={account.id}>
               <div className="card-head">
                 <div><strong>{account.name}</strong><span>{accountTypeLabel(account.type)}</span></div>
-                <button className="mini-button" onClick={() => edit(account)} aria-label="Editar"><Edit3 size={16} /></button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="mini-button" onClick={() => edit(account)} aria-label="Editar"><Edit3 size={16} /></button>
+                  <button className="mini-button" onClick={() => remove(account)} aria-label="Excluir"><Trash2 size={16} /></button>
+                </div>
               </div>
               <b>{money(account.balance, currency)}</b>
               {account.type === "credit" && <span>Limite {money(account.creditLimit, currency)} · Venc. dia {account.dueDay || "-"}</span>}
@@ -965,6 +975,18 @@ function SettingsView({ user, setUser, currency, theme, setTheme, downloadBackup
     const file = event.target.files?.[0];
     if (!file) return;
     try {
+      if (isPdfFile(file)) {
+        const accountId = importAccountId || data.accounts[0]?.id;
+        const contentBase64 = await fileToBase64(file);
+        const response = await apiRequest("/import/pdf", {
+          method: "POST",
+          token: localStorage.getItem("finora-token"),
+          body: { accountId, fileName: file.name, contentBase64 },
+        });
+        await loadData();
+        showToast(`${response.imported} lanÃ§amento(s) importado(s).`);
+        return;
+      }
       const rows = await parseTransactionsFile(file);
       const accountId = importAccountId || data.accounts[0]?.id;
       await apiRequest("/import/transactions", {
@@ -1322,10 +1344,13 @@ function fileToBase64(file) {
   });
 }
 
+function isPdfFile(file) {
+  const normalizedName = String(file?.name || "").toLowerCase();
+  return normalizedName.endsWith(".pdf");
+}
+
 async function parseTransactionsFile(file) {
   const normalizedName = String(file?.name || "").toLowerCase();
-  if (normalizedName.endsWith(".pdf")) return parsePdfTransactions(file);
-
   const text = await file.text();
   const normalizedText = String(text || "").trim();
   if (!normalizedText) throw new Error("Arquivo vazio.");

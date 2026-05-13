@@ -77,6 +77,12 @@ const importTransactionSchema = z.object({
   ).min(1).max(500),
 });
 
+const importPdfSchema = z.object({
+  accountId: z.string().optional(),
+  fileName: z.string().min(1).max(240),
+  contentBase64: z.string().min(1),
+});
+
 const budgetSchema = z.object({
   categoryId: z.string().min(1),
   month: monthSchema,
@@ -400,6 +406,50 @@ app.post("/api/import/transactions", auth, async (req: AuthRequest, res, next) =
           date: parseDate(row.date),
           tags: row.tags || "importado",
           notes: "Importado via CSV",
+        },
+        include: { account: true, transferAccount: true, category: true, attachments: true },
+      });
+      created.push(transaction);
+    }
+
+    res.status(201).json({ imported: created.length, transactions: created.map(serializeTransaction) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/import/pdf", auth, async (req: AuthRequest, res, next) => {
+  try {
+    const body = importPdfSchema.parse(req.body);
+    const accounts = await prisma.account.findMany({ where: { userId: req.userId, archived: false }, orderBy: { createdAt: "asc" } });
+    const accountId = body.accountId || accounts[0]?.id;
+    if (!accountId) return res.status(400).json({ error: "Cadastre uma conta antes de importar." });
+    await validateTransactionLinks(req.userId!, accountId, null, null);
+
+    const rows = await parsePdfImportRows(body.fileName, body.contentBase64);
+    if (!rows.length) {
+      return res.status(400).json({ error: "Nao consegui identificar lancamentos no PDF. PDFs em imagem ainda nao sao suportados." });
+    }
+
+    const categories = await prisma.category.findMany({ where: { userId: req.userId } });
+    const created = [];
+
+    for (const row of rows) {
+      const type: "income" | "expense" = row.type === "income" || row.type === "expense" ? row.type : (row.amount >= 0 ? "income" : "expense");
+      const amount = Math.abs(row.amount);
+      const category = guessCategory(categories, row.categoryName || row.description, type);
+      const transaction = await prisma.transaction.create({
+        data: {
+          userId: req.userId!,
+          accountId,
+          categoryId: category?.id || null,
+          type: toTransactionType(type),
+          status: "PAID",
+          description: row.description,
+          amountCents: Math.round(amount * 100),
+          date: parseDate(row.date),
+          tags: row.tags || "importado,pdf",
+          notes: "Importado via PDF",
         },
         include: { account: true, transferAccount: true, category: true, attachments: true },
       });
@@ -1100,6 +1150,216 @@ function guessCategory(categories: Array<{ id: string; name: string; type: strin
     }
   }
   return typed.find((item) => normalize(item.name) === "outros") || typed[0];
+}
+
+async function parsePdfImportRows(fileName: string, contentBase64: string) {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const bytes = new Uint8Array(Buffer.from(contentBase64, "base64"));
+  const document = await pdfjs.getDocument({
+    data: bytes,
+    useWorkerFetch: false,
+    disableFontFace: true,
+  }).promise;
+
+  const lines: string[] = [];
+  for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+    const page = await document.getPage(pageNumber);
+    const textContent = await page.getTextContent();
+    lines.push(...extractPdfLines(textContent));
+  }
+
+  await document.destroy();
+
+  const fullText = lines.join("\n");
+  return parsePdfStatementLines(lines, {
+    inferredYear: inferPdfYear(fileName, fullText),
+    expenseByDefault: inferPdfExpenseDefault(fileName, fullText),
+  });
+}
+
+function extractPdfLines(textContent: any) {
+  const positioned = textContent.items
+    .filter((item: any) => typeof item?.str === "string" && item.str.trim())
+    .map((item: any) => ({
+      text: item.str.replace(/\s+/g, " ").trim(),
+      x: item.transform?.[4] || 0,
+      y: item.transform?.[5] || 0,
+    }))
+    .sort((left: any, right: any) => (Math.abs(right.y - left.y) <= 2 ? left.x - right.x : right.y - left.y));
+
+  const lines: Array<{ y: number; items: Array<{ text: string; x: number; y: number }> }> = [];
+  for (const item of positioned) {
+    const current = lines[lines.length - 1];
+    if (!current || Math.abs(current.y - item.y) > 2) {
+      lines.push({ y: item.y, items: [item] });
+    } else {
+      current.items.push(item);
+    }
+  }
+
+  return lines
+    .map((line) => line.items.sort((left, right) => left.x - right.x).map((item) => item.text).join(" ").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+
+function parsePdfStatementLines(lines: string[], options: { inferredYear?: number; expenseByDefault?: boolean } = {}) {
+  const inferredYear = options.inferredYear || new Date().getFullYear();
+  const expenseByDefault = Boolean(options.expenseByDefault);
+  const rows = [];
+  const seen = new Set<string>();
+
+  for (const rawLine of lines) {
+    const line = String(rawLine || "").replace(/\s+/g, " ").trim();
+    if (!line || shouldSkipPdfLine(line)) continue;
+
+    const dateMatch = line.match(/\b(\d{2}[\/.-]\d{2}(?:[\/.-]\d{2,4})?)\b/);
+    if (!dateMatch) continue;
+
+    const amountMatches = [...line.matchAll(/(?:[-+]\s*)?(?:R\$\s*)?\d{1,3}(?:\.\d{3})*,\d{2}(?:\s*[-+])?(?:\s*(?:CR|DB|C|D))?/gi)];
+    if (!amountMatches.length) continue;
+
+    const amountPosition = expenseByDefault || amountMatches.length === 1 ? amountMatches.length - 1 : Math.max(0, amountMatches.length - 2);
+    const amountMatch = amountMatches[amountPosition];
+    const description = line
+      .slice((dateMatch.index || 0) + dateMatch[0].length, amountMatch.index || line.length)
+      .replace(/\s+/g, " ")
+      .replace(/^[\s\-:]+|[\s\-:]+$/g, "")
+      .trim();
+
+    if (!description || shouldSkipPdfDescription(description)) continue;
+
+    const amount = parsePdfAmount(amountMatch[0], description, expenseByDefault);
+    if (!Number.isFinite(amount) || amount === 0) continue;
+
+    const date = normalizePdfDate(dateMatch[1], inferredYear);
+    const key = `${date}|${description}|${amount.toFixed(2)}`;
+    if (seen.has(key)) continue;
+
+    seen.add(key);
+    rows.push({
+      date,
+      description,
+      amount,
+      type: amount >= 0 ? "income" : "expense",
+      categoryName: "",
+      tags: "importado,pdf",
+    });
+  }
+
+  return rows;
+}
+
+function shouldSkipPdfLine(line: string) {
+  const normalized = normalize(line);
+  return [
+    "saldo anterior",
+    "saldo final",
+    "saldo disponivel",
+    "saldo atual",
+    "resumo da fatura",
+    "pagamento minimo",
+    "data de vencimento",
+    "limite disponivel",
+    "extrato consolidado",
+    "demonstrativo",
+  ].some((snippet) => normalized.includes(snippet));
+}
+
+function shouldSkipPdfDescription(description: string) {
+  const normalized = normalize(description);
+  return [
+    "saldo anterior",
+    "saldo final",
+    "saldo do dia",
+    "saldo disponivel",
+    "total",
+    "subtotal",
+    "resumo",
+    "vencimento",
+    "limite",
+  ].some((snippet) => normalized === snippet || normalized.startsWith(`${snippet} `));
+}
+
+function parsePdfAmount(value: string, description: string, expenseByDefault: boolean) {
+  const upperValue = String(value || "").toUpperCase();
+  const digits = upperValue.replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3}(?:\D|$))/g, "");
+  const numeric = Number(digits.replace(",", ".").replace(/[-+]/g, ""));
+  if (!Number.isFinite(numeric)) return NaN;
+
+  const isDebit = /^\s*-/.test(upperValue) || /-\s*(?:DB|D)?\s*$/i.test(upperValue) || /\bDB\b|\bD\b/.test(upperValue);
+  const isCredit = /^\s*\+/.test(upperValue) || /\+\s*(?:CR|C)?\s*$/i.test(upperValue) || /\bCR\b|\bC\b/.test(upperValue);
+  if (isDebit && !isCredit) return -Math.abs(numeric);
+  if (isCredit && !isDebit) return Math.abs(numeric);
+
+  const normalizedDescription = normalize(description);
+  if ([
+    "credito",
+    "credit",
+    "recebido",
+    "deposito",
+    "pix recebido",
+    "estorno",
+    "reembolso",
+    "salario",
+  ].some((snippet) => normalizedDescription.includes(snippet))) {
+    return Math.abs(numeric);
+  }
+
+  if ([
+    "debito",
+    "debit",
+    "compra",
+    "pagamento",
+    "saque",
+    "tarifa",
+    "pix enviado",
+    "transferencia enviada",
+    "boleto",
+  ].some((snippet) => normalizedDescription.includes(snippet))) {
+    return -Math.abs(numeric);
+  }
+
+  return expenseByDefault ? -Math.abs(numeric) : numeric;
+}
+
+function normalizePdfDate(value: string, fallbackYear: number) {
+  const match = String(value || "").trim().match(/^(\d{2})[\/.-](\d{2})(?:[\/.-](\d{2,4}))?$/);
+  if (!match) return normalizeImportedDate(value);
+  const year = match[3] ? normalizeYear(match[3]) : fallbackYear;
+  return `${year}-${match[2]}-${match[1]}`;
+}
+
+function normalizeYear(value: string) {
+  const year = Number(value);
+  if (year < 100) return year >= 70 ? 1900 + year : 2000 + year;
+  return year;
+}
+
+function inferPdfYear(fileName: string, text: string) {
+  const source = `${fileName || ""}\n${String(text || "").slice(0, 4000)}`;
+  const years = [...source.matchAll(/\b(20\d{2})\b/g)].map((match) => Number(match[1])).filter((year) => year >= 2000 && year <= 2099);
+  return years[0] || new Date().getFullYear();
+}
+
+function inferPdfExpenseDefault(fileName: string, text: string) {
+  const normalized = normalize(`${fileName || ""}\n${text || ""}`);
+  return [
+    "resumo da fatura",
+    "cartao de credito",
+    "cartao",
+    "fatura",
+    "vencimento",
+    "limite disponivel",
+  ].some((snippet) => normalized.includes(snippet));
+}
+
+function normalizeImportedDate(value: string) {
+  const raw = String(value || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  if (/^\d{8}(?:\d{6})?(?:\.\d+)?(?:\[[^\]]+\])?$/.test(raw)) return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
+  const match = raw.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
+  if (match) return `${match[3]}-${match[2]}-${match[1]}`;
+  throw new Error(`Data invalida no PDF: ${raw}`);
 }
 
 function normalize(value: string) {
